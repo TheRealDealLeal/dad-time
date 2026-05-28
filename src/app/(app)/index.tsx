@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useEvents } from '../../hooks/useEvents';
 import EventCard from '../../components/EventCard';
 import EmptyState from '../../components/EmptyState';
-import { Colors, Typography, Spacing, Shadow } from '../../constants/theme';
+import { Colors, Typography, Spacing, Radius, Shadow } from '../../constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -25,16 +25,37 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Dad Time</Text>
-        <Pressable onPress={signOut} hitSlop={8}>
-          <Text style={styles.signOutBtn}>Sign out</Text>
+        <View>
+          <Text style={styles.headerEyebrow}>WELCOME BACK</Text>
+          <Text style={styles.headerTitle}>Dad Time 🍺</Text>
+        </View>
+        <Pressable
+          onPress={signOut}
+          style={styles.signOutBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          hitSlop={8}
+        >
+          <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
+      </View>
+
+      {/* Section label */}
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionLabel}>YOUR HANGOUTS</Text>
+        {events.length > 0 && (
+          <View style={styles.countPill}>
+            <Text style={styles.countPillText}>{events.length}</Text>
+          </View>
+        )}
       </View>
 
       {loading && events.length === 0 ? (
         <View style={styles.center}>
-          <ActivityIndicator color={Colors.primary} />
+          <ActivityIndicator color={Colors.primary} size="large" />
+          <Text style={styles.loadingText}>Getting the crew…</Text>
         </View>
       ) : (
         <FlatList
@@ -50,25 +71,31 @@ export default function HomeScreen() {
               refreshing={loading}
               onRefresh={onRefresh}
               tintColor={Colors.primary}
+              colors={[Colors.primary]}
             />
           }
           ListEmptyComponent={
             <EmptyState
               title="Nothing on the books"
               subtitle="Create a hangout and get the crew together."
-              actionLabel="Plan something"
+              actionLabel="Plan Something"
               onAction={() => router.push('/(app)/create')}
             />
           }
+          showsVerticalScrollIndicator={false}
         />
       )}
 
-      <View style={styles.fab}>
+      {/* FAB */}
+      <View style={styles.fabContainer}>
         <Pressable
-          style={({ pressed }) => [styles.fabBtn, pressed && styles.fabPressed]}
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
           onPress={() => router.push('/(app)/create')}
+          accessibilityRole="button"
+          accessibilityLabel="Create a new hangout"
         >
           <Text style={styles.fabIcon}>+</Text>
+          <Text style={styles.fabLabel}>NEW HANGOUT</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -85,58 +112,114 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 4,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.primary,
+  },
+  headerEyebrow: {
+    ...Typography.label,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 2,
+    fontSize: 9,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: Colors.primary,
+    fontSize: 26,
+    fontWeight: '900',
+    color: Colors.white,
     letterSpacing: -0.5,
   },
   signOutBtn: {
-    ...Typography.bodySm,
-    color: Colors.textDim,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    minHeight: 44, // WCAG touch target
+    justifyContent: 'center',
+  },
+  signOutText: {
+    ...Typography.caption,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  sectionLabel: {
+    ...Typography.label,
+    color: Colors.textFaint,
+    letterSpacing: 1.5,
+  },
+  countPill: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    minWidth: 22,
+    alignItems: 'center',
+  },
+  countPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.white,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  loadingText: {
+    ...Typography.bodySm,
+    color: Colors.textFaint,
   },
   listContent: {
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: 100, // room for FAB
   },
   emptyContent: {
     flex: 1,
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
   },
   separator: {
     height: Spacing.sm,
   },
-  fab: {
+  fabContainer: {
     position: 'absolute',
     bottom: Spacing.xl,
+    left: Spacing.md,
     right: Spacing.md,
-  },
-  fabBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primary,
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  fab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Radius.full,
+    gap: Spacing.sm,
     ...Shadow.md,
   },
   fabPressed: {
     opacity: 0.85,
-    transform: [{ scale: 0.95 }],
+    transform: [{ scale: 0.97 }],
   },
   fabIcon: {
-    fontSize: 28,
+    fontSize: 22,
     color: Colors.white,
-    lineHeight: 32,
     fontWeight: '300',
+    lineHeight: 26,
+  },
+  fabLabel: {
+    ...Typography.label,
+    color: Colors.white,
+    letterSpacing: 2,
+    fontSize: 12,
   },
 });

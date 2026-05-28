@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Typography, Spacing } from '../constants/theme';
+import { Colors, Typography, Spacing, Radius } from '../constants/theme';
 import Button from './Button';
 
 type Props = {
@@ -13,11 +13,20 @@ type Props = {
 export default function EmptyState({ title, subtitle, actionLabel, onAction }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.emoji}>🍺</Text>
+      {/* Illustrated badge */}
+      <View style={styles.badge}>
+        <Text style={styles.badgeEmoji}>🍺</Text>
+      </View>
+
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
+
       {actionLabel && onAction && (
-        <Button label={actionLabel} onPress={onAction} style={styles.btn} />
+        <Button
+          label={actionLabel}
+          onPress={onAction}
+          style={styles.btn}
+        />
       )}
     </View>
   );
@@ -31,9 +40,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     gap: Spacing.md,
   },
-  emoji: {
-    fontSize: 56,
+  badge: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 3,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: Spacing.sm,
+  },
+  badgeEmoji: {
+    fontSize: 44,
   },
   title: {
     ...Typography.titleLg,
@@ -44,6 +63,7 @@ const styles = StyleSheet.create({
     ...Typography.bodyMd,
     color: Colors.textDim,
     textAlign: 'center',
+    maxWidth: 260,
   },
   btn: {
     marginTop: Spacing.sm,

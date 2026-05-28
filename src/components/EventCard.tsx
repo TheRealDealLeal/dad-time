@@ -4,19 +4,16 @@ import { useRouter } from 'expo-router';
 import { Colors, Radius, Typography, Spacing, Shadow } from '../constants/theme';
 import { Event, RsvpStatus } from '../types/database';
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
+const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
 function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function countsByStatus(event: Event) {
+function countsByStatus(rsvps: Event['rsvps']) {
   const counts = { yes: 0, maybe: 0, no: 0 };
-  event.rsvps?.forEach(r => { counts[r.status as RsvpStatus]++; });
+  rsvps?.forEach(r => { counts[r.status as RsvpStatus]++; });
   return counts;
 }
 
@@ -27,72 +24,80 @@ type Props = {
 
 export default function EventCard({ event, currentUserId }: Props) {
   const router = useRouter();
-  const counts = countsByStatus(event);
-  const myRsvp = event.rsvps?.find(r => r.user_id === currentUserId)?.status ?? null;
+  const d = new Date(event.date);
+  const counts = countsByStatus(event.rsvps);
+  const myRsvp = event.rsvps?.find(r => r.user_id === currentUserId)?.status as RsvpStatus | null ?? null;
   const isOwner = event.created_by === currentUserId;
 
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       onPress={() => router.push(`/event/${event.id}`)}
+      accessibilityRole="button"
+      accessibilityLabel={`${event.title}, ${DAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${d.getDate()} at ${formatTime(event.date)}`}
     >
-      {/* Date stripe */}
-      <View style={styles.dateStripe}>
-        <Text style={styles.dayOfWeek}>
-          {new Date(event.date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
-        </Text>
-        <Text style={styles.dayNum}>
-          {new Date(event.date).getDate()}
-        </Text>
+      {/* Date column */}
+      <View style={styles.dateCol}>
+        <Text style={styles.month}>{MONTHS[d.getMonth()]}</Text>
+        <Text style={styles.day}>{d.getDate()}</Text>
+        <Text style={styles.dow}>{DAYS[d.getDay()]}</Text>
       </View>
+
+      {/* Divider */}
+      <View style={styles.divider} />
 
       {/* Main content */}
       <View style={styles.body}>
         <View style={styles.topRow}>
           <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-          {isOwner && <Text style={styles.ownerBadge}>Host</Text>}
+          {isOwner && (
+            <View style={styles.hostBadge}>
+              <Text style={styles.hostBadgeText}>HOST</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{formatTime(event.date)}</Text>
+          <Text style={styles.time}>{formatTime(event.date)}</Text>
           {event.location ? (
             <>
-              <Text style={styles.dot}>·</Text>
-              <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
+              <Text style={styles.dot}> · </Text>
+              <Text style={styles.location} numberOfLines={1}>{event.location}</Text>
             </>
           ) : null}
         </View>
 
-        {/* RSVP counts */}
-        <View style={styles.countsRow}>
-          <View style={styles.countChip}>
+        {/* Crew counts */}
+        <View style={styles.bottomRow}>
+          <View style={styles.counts}>
             <Text style={[styles.countNum, { color: Colors.yes }]}>{counts.yes}</Text>
-            <Text style={styles.countLabel}>In</Text>
-          </View>
-          <View style={styles.countChip}>
+            <Text style={styles.countLbl}> in</Text>
+            <Text style={styles.countSep}>  ·  </Text>
             <Text style={[styles.countNum, { color: Colors.maybe }]}>{counts.maybe}</Text>
-            <Text style={styles.countLabel}>Maybe</Text>
-          </View>
-          <View style={styles.countChip}>
-            <Text style={[styles.countNum, { color: Colors.textFaint }]}>{counts.no}</Text>
-            <Text style={styles.countLabel}>Out</Text>
+            <Text style={styles.countLbl}> maybe</Text>
+            {counts.no > 0 && (
+              <>
+                <Text style={styles.countSep}>  ·  </Text>
+                <Text style={[styles.countNum, { color: Colors.no }]}>{counts.no}</Text>
+                <Text style={styles.countLbl}> out</Text>
+              </>
+            )}
           </View>
 
-          {/* My RSVP indicator */}
           {myRsvp && (
             <View style={[
-              styles.myRsvpPill,
-              myRsvp === 'yes' && { backgroundColor: Colors.yesBg },
+              styles.rsvpPill,
+              myRsvp === 'yes'   && { backgroundColor: Colors.yesBg },
               myRsvp === 'maybe' && { backgroundColor: Colors.maybeBg },
-              myRsvp === 'no' && { backgroundColor: Colors.noBg },
+              myRsvp === 'no'    && { backgroundColor: Colors.noBg },
             ]}>
               <Text style={[
-                styles.myRsvpText,
-                myRsvp === 'yes' && { color: Colors.yes },
+                styles.rsvpPillText,
+                myRsvp === 'yes'   && { color: Colors.yes },
                 myRsvp === 'maybe' && { color: Colors.maybe },
-                myRsvp === 'no' && { color: Colors.no },
+                myRsvp === 'no'    && { color: Colors.no },
               ]}>
-                {myRsvp === 'yes' ? 'You\'re in' : myRsvp === 'maybe' ? 'You\'re maybe' : 'You\'re out'}
+                {myRsvp === 'yes' ? "You're in" : myRsvp === 'maybe' ? 'Maybe' : "You're out"}
               </Text>
             </View>
           )}
@@ -108,34 +113,50 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     flexDirection: 'row',
     overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     ...Shadow.sm,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.88,
     transform: [{ scale: 0.99 }],
   },
-  dateStripe: {
-    width: 56,
+  dateCol: {
+    width: 62,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.md,
+    gap: 1,
   },
-  dayOfWeek: {
-    ...Typography.label,
-    color: 'rgba(255,255,255,0.7)',
+  month: {
     fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: 'rgba(255,255,255,0.65)',
   },
-  dayNum: {
-    fontSize: 24,
-    fontWeight: '800',
+  day: {
+    fontSize: 30,
+    fontWeight: '900',
     color: Colors.white,
-    lineHeight: 28,
+    lineHeight: 34,
+    letterSpacing: -1,
+  },
+  dow: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  divider: {
+    width: 3,
+    backgroundColor: Colors.primaryLight,
   },
   body: {
     flex: 1,
-    padding: Spacing.md,
-    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 4,
+    gap: 4,
   },
   topRow: {
     flexDirection: 'row',
@@ -147,54 +168,67 @@ const styles = StyleSheet.create({
     color: Colors.text,
     flex: 1,
   },
-  ownerBadge: {
-    ...Typography.label,
-    fontSize: 10,
-    color: Colors.primary,
-    backgroundColor: 'rgba(15,52,96,0.08)',
+  hostBadge: {
+    backgroundColor: Colors.primaryLight,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.xs,
+    borderWidth: 1,
+    borderColor: Colors.primaryMid,
+  },
+  hostBadgeText: {
+    ...Typography.label,
+    color: Colors.primaryMid,
+    fontSize: 9,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
   },
-  metaText: {
+  time: {
     ...Typography.bodySm,
     color: Colors.textDim,
-    flexShrink: 1,
+    fontWeight: '500',
   },
   dot: {
-    color: Colors.textFaint,
-  },
-  countsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginTop: 2,
-  },
-  countChip: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 3,
-  },
-  countNum: {
-    ...Typography.titleSm,
-  },
-  countLabel: {
     ...Typography.bodySm,
     color: Colors.textFaint,
   },
-  myRsvpPill: {
-    marginLeft: 'auto',
+  location: {
+    ...Typography.bodySm,
+    color: Colors.textDim,
+    flex: 1,
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  counts: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  countNum: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  countLbl: {
+    ...Typography.bodySm,
+    color: Colors.textFaint,
+  },
+  countSep: {
+    ...Typography.bodySm,
+    color: Colors.border,
+  },
+  rsvpPill: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Radius.full,
   },
-  myRsvpText: {
-    fontSize: 12,
-    fontWeight: '600',
+  rsvpPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

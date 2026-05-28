@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
-  SafeAreaView, Pressable, ActivityIndicator, Platform,
-  KeyboardAvoidingView,
+  SafeAreaView, Pressable, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
@@ -18,6 +17,7 @@ export default function CreateScreen() {
 
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
+  const [note, setNote] = useState('');
   const [date, setDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -26,7 +26,7 @@ export default function CreateScreen() {
 
   async function handleCreate() {
     if (!title.trim()) {
-      setError('Give it a name.');
+      setError('Give it a name — what are you planning?');
       return;
     }
     setError('');
@@ -35,10 +35,11 @@ export default function CreateScreen() {
       await createEvent({
         title: title.trim(),
         location: location.trim() || undefined,
+        note: note.trim() || undefined,
         date,
       });
       router.back();
-    } catch (e) {
+    } catch {
       setError('Something went wrong. Try again.');
     } finally {
       setLoading(false);
@@ -46,7 +47,7 @@ export default function CreateScreen() {
   }
 
   const formattedDate = date.toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
+    weekday: 'short', month: 'short', day: 'numeric',
   });
   const formattedTime = date.toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit',
@@ -60,43 +61,63 @@ export default function CreateScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Text style={styles.cancel}>Cancel</Text>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            style={styles.cancelBtn}
+          >
+            <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>New Hangout</Text>
-          <View style={{ width: 60 }} />
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerEyebrow}>NEW</Text>
+            <Text style={styles.headerTitle}>HANGOUT</Text>
+          </View>
+          <View style={{ width: 70 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {/* Title */}
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* What */}
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>WHAT'S HAPPENING</Text>
             <TextInput
               style={styles.input}
-              placeholder="Game night, golf, bar crawl…"
+              placeholder="Game night, golf, bar crawl, poker…"
               placeholderTextColor={Colors.textFaint}
               value={title}
               onChangeText={setTitle}
               maxLength={80}
               autoFocus
+              accessibilityLabel="Event name"
             />
           </View>
 
-          {/* Date */}
+          {/* When */}
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>WHEN</Text>
             <View style={styles.dateRow}>
               <Pressable
-                style={styles.dateChip}
+                style={({ pressed }) => [styles.dateChip, pressed && styles.dateChipPressed]}
                 onPress={() => { setShowDatePicker(!showDatePicker); setShowTimePicker(false); }}
+                accessibilityRole="button"
+                accessibilityLabel={`Date: ${formattedDate}. Tap to change.`}
               >
-                <Text style={styles.dateChipText}>{formattedDate}</Text>
+                <Text style={styles.dateChipEye}>DATE</Text>
+                <Text style={styles.dateChipVal}>{formattedDate}</Text>
               </Pressable>
               <Pressable
-                style={styles.dateChip}
+                style={({ pressed }) => [styles.dateChip, pressed && styles.dateChipPressed]}
                 onPress={() => { setShowTimePicker(!showTimePicker); setShowDatePicker(false); }}
+                accessibilityRole="button"
+                accessibilityLabel={`Time: ${formattedTime}. Tap to change.`}
               >
-                <Text style={styles.dateChipText}>{formattedTime}</Text>
+                <Text style={styles.dateChipEye}>TIME</Text>
+                <Text style={styles.dateChipVal}>{formattedTime}</Text>
               </Pressable>
             </View>
 
@@ -136,20 +157,42 @@ export default function CreateScreen() {
             )}
           </View>
 
-          {/* Location */}
+          {/* Where */}
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>WHERE (OPTIONAL)</Text>
+            <Text style={styles.fieldLabel}>WHERE <Text style={styles.optional}>(OPTIONAL)</Text></Text>
             <TextInput
               style={styles.input}
-              placeholder="Address or spot name"
+              placeholder="Address, spot name, TBD…"
               placeholderTextColor={Colors.textFaint}
               value={location}
               onChangeText={setLocation}
               maxLength={120}
+              accessibilityLabel="Event location"
             />
           </View>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {/* Note */}
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>DETAILS <Text style={styles.optional}>(OPTIONAL)</Text></Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Anything the crew needs to know…"
+              placeholderTextColor={Colors.textFaint}
+              value={note}
+              onChangeText={setNote}
+              maxLength={500}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              accessibilityLabel="Event details"
+            />
+          </View>
+
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
 
           <Button
             label="Create & Share"
@@ -175,22 +218,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 4,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: Colors.primary,
+  },
+  cancelBtn: {
+    minWidth: 70,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  cancelText: {
+    ...Typography.bodyMd,
+    color: 'rgba(255,255,255,0.75)',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    gap: 0,
+  },
+  headerEyebrow: {
+    ...Typography.label,
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 3,
+    fontSize: 9,
   },
   headerTitle: {
-    ...Typography.titleMd,
-    color: Colors.text,
-  },
-  cancel: {
-    ...Typography.bodyMd,
-    color: Colors.primary,
-    minWidth: 60,
+    fontSize: 18,
+    fontWeight: '900',
+    color: Colors.white,
+    letterSpacing: 3,
   },
   content: {
     padding: Spacing.md,
     gap: Spacing.md,
+    paddingBottom: Spacing.xxl,
   },
   field: {
     gap: Spacing.xs,
@@ -198,11 +256,17 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...Typography.label,
     color: Colors.textFaint,
+    letterSpacing: 1.5,
+  },
+  optional: {
+    ...Typography.label,
+    color: Colors.border,
+    letterSpacing: 1,
   },
   input: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: Colors.border,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 4,
@@ -210,25 +274,46 @@ const styles = StyleSheet.create({
     color: Colors.text,
     minHeight: 52,
   },
+  textArea: {
+    minHeight: 88,
+    paddingTop: Spacing.sm + 4,
+  },
   dateRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
-    flexWrap: 'wrap',
   },
   dateChip: {
+    flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderWidth: 2,
+    borderColor: Colors.primary,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 4,
+    paddingVertical: Spacing.sm,
+    gap: 2,
     ...Shadow.sm,
   },
-  dateChipText: {
+  dateChipPressed: {
+    opacity: 0.75,
+  },
+  dateChipEye: {
+    ...Typography.label,
+    color: Colors.primaryMid,
+    letterSpacing: 1.5,
+    fontSize: 9,
+  },
+  dateChipVal: {
     ...Typography.titleSm,
     color: Colors.primary,
   },
-  error: {
+  errorBox: {
+    backgroundColor: Colors.noBg,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.no,
+    padding: Spacing.md,
+  },
+  errorText: {
     ...Typography.bodySm,
     color: Colors.no,
     textAlign: 'center',

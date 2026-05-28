@@ -12,11 +12,12 @@ import { Colors, Typography, Spacing, Radius, Shadow } from '../../constants/the
 import { Event, RsvpStatus } from '../../types/database';
 import { supabase } from '../../lib/supabase';
 
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  }) + ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 export default function EventDetailScreen() {
@@ -51,7 +52,7 @@ export default function EventDetailScreen() {
       await upsertRsvp(event.id, status);
       await loadEvent();
     } catch {
-      // loadEvent will re-sync state on failure
+      // loadEvent will re-sync on failure
     } finally {
       setRsvpLoading(false);
     }
@@ -68,24 +69,28 @@ export default function EventDetailScreen() {
 
   async function handleDelete() {
     if (!event) return;
-    Alert.alert('Delete Hangout', 'This will remove the event for everyone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.from('events').delete().eq('id', event.id);
-          router.back();
+    Alert.alert(
+      'Delete Hangout?',
+      'This removes the event for everyone. No take-backs.',
+      [
+        { text: 'Keep It', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.from('events').delete().eq('id', event.id);
+            if (!error) router.back();
+          },
         },
-      },
-    ]);
+      ]
+    );
   }
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator color={Colors.primary} />
+          <ActivityIndicator color={Colors.primary} size="large" />
         </View>
       </SafeAreaView>
     );
@@ -95,8 +100,9 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={styles.errorText}>Event not found.</Text>
-          <Button label="Go back" onPress={() => router.back()} variant="ghost" />
+          <Text style={styles.notFoundEmoji}>🤷</Text>
+          <Text style={styles.notFoundText}>Event not found.</Text>
+          <Button label="Go Back" onPress={() => router.back()} variant="ghost" />
         </View>
       </SafeAreaView>
     );
@@ -106,63 +112,101 @@ export default function EventDetailScreen() {
   const isOwner = event.created_by === session!.user.id;
   const counts = { yes: 0, maybe: 0, no: 0 };
   event.rsvps?.forEach(r => { counts[r.status as RsvpStatus]++; });
+  const d = new Date(event.date);
 
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Text style={styles.backBtn}>← Back</Text>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={8}
+        >
+          <Text style={styles.backBtnText}>← Back</Text>
         </Pressable>
-        {isOwner && (
-          <Pressable onPress={handleDelete} hitSlop={8}>
-            <Text style={styles.deleteBtn}>Delete</Text>
+        <Text style={styles.headerTitle}>HANGOUT</Text>
+        {isOwner ? (
+          <Pressable
+            onPress={handleDelete}
+            style={styles.deleteBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Delete event"
+            hitSlop={8}
+          >
+            <Text style={styles.deleteBtnText}>Delete</Text>
           </Pressable>
+        ) : (
+          <View style={{ width: 60 }} />
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Event info */}
-        <View style={styles.card}>
-          <Text style={styles.title}>{event.title}</Text>
-          <Text style={styles.datetime}>{formatDateTime(event.date)}</Text>
-          {event.location ? (
-            <Text style={styles.location}>{event.location}</Text>
-          ) : null}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Event hero card */}
+        <View style={styles.heroCard}>
+          {/* Date badge */}
+          <View style={styles.dateBadge}>
+            <Text style={styles.dateBadgeMonth}>
+              {['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()]}
+            </Text>
+            <Text style={styles.dateBadgeDay}>{d.getDate()}</Text>
+            <Text style={styles.dateBadgeDow}>
+              {['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()]}
+            </Text>
+          </View>
+
+          <View style={styles.heroBody}>
+            <Text style={styles.eventTitle}>{event.title}</Text>
+            <Text style={styles.eventDateTime}>{formatDateTime(event.date)}</Text>
+            {event.location ? (
+              <Text style={styles.eventLocation}>📍 {event.location}</Text>
+            ) : null}
+            {event.note ? (
+              <Text style={styles.eventNote}>{event.note}</Text>
+            ) : null}
+          </View>
+
           {isOwner && (
-            <View style={styles.hostBadge}>
-              <Text style={styles.hostBadgeText}>You're hosting</Text>
+            <View style={styles.hostBanner}>
+              <Text style={styles.hostBannerText}>YOU'RE HOSTING</Text>
             </View>
           )}
         </View>
 
         {/* RSVP */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>ARE YOU IN?</Text>
-          <RsvpButtons
-            current={myRsvp}
-            onSelect={handleRsvp}
-            disabled={rsvpLoading}
-          />
+          <Text style={styles.sectionLabel}>YOUR RSVP</Text>
+          {rsvpLoading ? (
+            <View style={styles.rsvpLoading}>
+              <ActivityIndicator color={Colors.primary} />
+            </View>
+          ) : (
+            <RsvpButtons current={myRsvp} onSelect={handleRsvp} />
+          )}
         </View>
 
-        {/* Counts */}
+        {/* Crew */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>THE CREW</Text>
-          <View style={styles.countsRow}>
-            <View style={styles.countBlock}>
-              <Text style={[styles.countNum, { color: Colors.yes }]}>{counts.yes}</Text>
-              <Text style={styles.countLbl}>In</Text>
+          <View style={styles.crewCard}>
+            <View style={styles.crewStat}>
+              <Text style={[styles.crewNum, { color: Colors.yes }]}>{counts.yes}</Text>
+              <Text style={styles.crewLbl}>In</Text>
             </View>
-            <View style={styles.countDivider} />
-            <View style={styles.countBlock}>
-              <Text style={[styles.countNum, { color: Colors.maybe }]}>{counts.maybe}</Text>
-              <Text style={styles.countLbl}>Maybe</Text>
+            <View style={styles.crewDivider} />
+            <View style={styles.crewStat}>
+              <Text style={[styles.crewNum, { color: Colors.maybe }]}>{counts.maybe}</Text>
+              <Text style={styles.crewLbl}>Maybe</Text>
             </View>
-            <View style={styles.countDivider} />
-            <View style={styles.countBlock}>
-              <Text style={[styles.countNum, { color: Colors.textFaint }]}>{counts.no}</Text>
-              <Text style={styles.countLbl}>Out</Text>
+            <View style={styles.crewDivider} />
+            <View style={styles.crewStat}>
+              <Text style={[styles.crewNum, { color: Colors.textFaint }]}>{counts.no}</Text>
+              <Text style={styles.crewLbl}>Out</Text>
             </View>
           </View>
         </View>
@@ -170,16 +214,22 @@ export default function EventDetailScreen() {
         {/* Share */}
         {event.invite_code && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>INVITE LINK</Text>
-            <Button
-              label="Share Invite Link"
-              onPress={handleShare}
-              variant="secondary"
-              fullWidth
-            />
-            <Text style={styles.inviteHint}>
-              Anyone with the link can RSVP — no app required.
-            </Text>
+            <Text style={styles.sectionLabel}>INVITE THE CREW</Text>
+            <View style={styles.shareCard}>
+              <Text style={styles.shareEmoji}>🔗</Text>
+              <View style={styles.shareBody}>
+                <Text style={styles.shareTitle}>Share invite link</Text>
+                <Text style={styles.shareDesc}>Anyone can RSVP — no app required.</Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [styles.shareBtn, pressed && { opacity: 0.75 }]}
+                onPress={handleShare}
+                accessibilityRole="button"
+                accessibilityLabel="Share invite link"
+              >
+                <Text style={styles.shareBtnText}>Share</Text>
+              </Pressable>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -198,100 +248,203 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
   },
+  notFoundEmoji: { fontSize: 48 },
+  notFoundText: { ...Typography.titleMd, color: Colors.textDim },
+
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 4,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: Colors.primary,
   },
   backBtn: {
+    minWidth: 60,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  backBtnText: {
     ...Typography.bodyMd,
-    color: Colors.primary,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: Colors.white,
+    letterSpacing: 3,
   },
   deleteBtn: {
-    ...Typography.bodySm,
-    color: Colors.no,
+    minWidth: 60,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
   },
+  deleteBtnText: {
+    ...Typography.bodySm,
+    color: 'rgba(255,100,100,0.85)',
+    fontWeight: '600',
+  },
+
   content: {
     padding: Spacing.md,
     gap: Spacing.md,
+    paddingBottom: Spacing.xxl,
   },
-  card: {
+
+  heroCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    padding: Spacing.md,
-    gap: Spacing.xs,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     ...Shadow.sm,
   },
-  title: {
-    ...Typography.titleLg,
+  dateBadge: {
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    gap: 2,
+  },
+  dateBadgeMonth: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  dateBadgeDay: {
+    fontSize: 48,
+    fontWeight: '900',
+    color: Colors.white,
+    lineHeight: 52,
+    letterSpacing: -2,
+  },
+  dateBadgeDow: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  heroBody: {
+    padding: Spacing.md,
+    gap: Spacing.xs,
+  },
+  eventTitle: {
+    ...Typography.displayMd,
     color: Colors.text,
   },
-  datetime: {
+  eventDateTime: {
+    ...Typography.bodyMd,
+    color: Colors.textDim,
+    marginTop: 4,
+  },
+  eventLocation: {
     ...Typography.bodyMd,
     color: Colors.textDim,
   },
-  location: {
-    ...Typography.bodySm,
+  eventNote: {
+    ...Typography.bodyMd,
     color: Colors.textDim,
-  },
-  hostBadge: {
-    alignSelf: 'flex-start',
+    fontStyle: 'italic',
     marginTop: Spacing.xs,
-    backgroundColor: 'rgba(15,52,96,0.08)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: Radius.full,
+    paddingTop: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
-  hostBadgeText: {
+  hostBanner: {
+    backgroundColor: Colors.primaryLight,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  hostBannerText: {
     ...Typography.label,
-    color: Colors.primary,
-    fontSize: 12,
+    color: Colors.primaryMid,
+    letterSpacing: 2,
   },
+
   section: {
     gap: Spacing.sm,
   },
   sectionLabel: {
     ...Typography.label,
     color: Colors.textFaint,
+    letterSpacing: 1.5,
   },
-  countsRow: {
+  rsvpLoading: {
+    minHeight: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  crewCard: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     padding: Spacing.md,
     ...Shadow.sm,
   },
-  countBlock: {
+  crewStat: {
     flex: 1,
     alignItems: 'center',
     gap: 4,
   },
-  countDivider: {
-    width: 1,
+  crewDivider: {
+    width: 1.5,
     backgroundColor: Colors.border,
     marginVertical: 4,
   },
-  countNum: {
+  crewNum: {
+    fontSize: 36,
+    fontWeight: '900',
+    lineHeight: 40,
+    letterSpacing: -1,
+  },
+  crewLbl: {
+    ...Typography.caption,
+    color: Colors.textDim,
+    fontWeight: '600',
+  },
+
+  shareCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+    ...Shadow.sm,
+  },
+  shareEmoji: {
     fontSize: 28,
-    fontWeight: '800',
-    lineHeight: 32,
   },
-  countLbl: {
+  shareBody: {
+    flex: 1,
+    gap: 2,
+  },
+  shareTitle: {
+    ...Typography.titleSm,
+    color: Colors.text,
+  },
+  shareDesc: {
     ...Typography.bodySm,
     color: Colors.textDim,
   },
-  inviteHint: {
-    ...Typography.bodySm,
-    color: Colors.textFaint,
-    textAlign: 'center',
+  shareBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    minHeight: 44,
+    justifyContent: 'center',
   },
-  errorText: {
-    ...Typography.bodyMd,
-    color: Colors.textDim,
+  shareBtnText: {
+    ...Typography.titleSm,
+    color: Colors.white,
   },
 });

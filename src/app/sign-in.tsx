@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator,
-  Platform, SafeAreaView, Image,
+  Platform, SafeAreaView,
 } from 'react-native';
 import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -43,14 +43,36 @@ export default function SignIn() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
+
         {/* Hero */}
         <View style={styles.hero}>
-          <Text style={styles.logo}>🍺</Text>
-          <Text style={styles.appName}>Dad Time</Text>
-          <Text style={styles.tagline}>Get the crew together.</Text>
+          {/* Label badge */}
+          <View style={styles.labelBorder}>
+            <View style={styles.labelInner}>
+              <Text style={styles.labelTopText}>EST. 2025</Text>
+
+              <View style={styles.mugWrap}>
+                <Text style={styles.mug}>🍺</Text>
+              </View>
+
+              <Text style={styles.appName}>DAD TIME</Text>
+              <View style={styles.dividerLine} />
+              <Text style={styles.tagline}>GET THE CREW TOGETHER</Text>
+            </View>
+          </View>
+
           <Text style={styles.sub}>
-            Schedule hangouts, see who's in, and actually make it happen.
+            Schedule hangouts, see who's in,{'\n'}and actually make it happen.
           </Text>
+        </View>
+
+        {/* Activity icons row */}
+        <View style={styles.activitiesRow}>
+          {['🏌️', '🎮', '🎯', '🏈', '🎸', '🍕'].map((emoji, i) => (
+            <View key={i} style={styles.activityChip}>
+              <Text style={styles.activityEmoji}>{emoji}</Text>
+            </View>
+          ))}
         </View>
 
         {/* Auth buttons */}
@@ -59,9 +81,11 @@ export default function SignIn() {
             style={({ pressed }) => [styles.authBtn, pressed && styles.pressed]}
             onPress={() => signInWith('google')}
             disabled={!!loading}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
           >
             {loading === 'google' ? (
-              <ActivityIndicator color={Colors.text} size="small" />
+              <ActivityIndicator color={Colors.primary} size="small" />
             ) : (
               <>
                 <Text style={styles.authBtnIcon}>G</Text>
@@ -75,6 +99,8 @@ export default function SignIn() {
               style={({ pressed }) => [styles.authBtn, styles.appleBtn, pressed && styles.pressed]}
               onPress={() => signInWith('apple')}
               disabled={!!loading}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Apple"
             >
               {loading === 'apple' ? (
                 <ActivityIndicator color={Colors.white} size="small" />
@@ -106,35 +132,93 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     justifyContent: 'space-between',
     paddingBottom: Spacing.xl,
+    paddingTop: Spacing.lg,
   },
   hero: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.lg,
   },
-  logo: {
-    fontSize: 72,
-    marginBottom: Spacing.md,
+
+  // Craft label design
+  labelBorder: {
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.35)',
+    borderRadius: Radius.xl,
+    padding: 6,
+  },
+  labelInner: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+    gap: Spacing.xs,
+    minWidth: 260,
+  },
+  labelTopText: {
+    ...Typography.label,
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 3,
+    fontSize: 10,
+  },
+  mugWrap: {
+    marginVertical: Spacing.sm,
+  },
+  mug: {
+    fontSize: 64,
   },
   appName: {
-    fontSize: 42,
+    fontSize: 46,
     fontWeight: '900',
     color: Colors.white,
-    letterSpacing: -1,
+    letterSpacing: 4,
+    lineHeight: 50,
+  },
+  dividerLine: {
+    height: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    width: 160,
+    marginVertical: Spacing.xs,
   },
   tagline: {
-    ...Typography.titleLg,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '600',
+    ...Typography.label,
+    color: 'rgba(255,255,255,0.65)',
+    letterSpacing: 2.5,
+    fontSize: 10,
   },
+
   sub: {
     ...Typography.bodyMd,
     color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
-    maxWidth: 280,
-    marginTop: Spacing.sm,
+    lineHeight: 24,
   },
+
+  // Activity row
+  activitiesRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+  },
+  activityChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityEmoji: {
+    fontSize: 20,
+  },
+
+  // Auth buttons
   authSection: {
     gap: Spacing.sm,
   },
@@ -147,31 +231,32 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     gap: Spacing.sm,
     minHeight: 54,
-    ...Shadow.sm,
+    ...Shadow.md,
   },
   appleBtn: {
     backgroundColor: Colors.black,
   },
   authBtnIcon: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
     color: Colors.text,
   },
   authBtnLabel: {
-    ...Typography.titleMd,
+    ...Typography.titleSm,
     color: Colors.text,
+    letterSpacing: 0.2,
   },
   appleBtnText: {
     color: Colors.white,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.82,
     transform: [{ scale: 0.99 }],
   },
   disclaimer: {
     ...Typography.bodySm,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.35)',
     textAlign: 'center',
-    marginTop: Spacing.sm,
+    marginTop: Spacing.xs,
   },
 });

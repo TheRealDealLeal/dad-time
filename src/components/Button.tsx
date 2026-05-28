@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { Pressable, Text, ActivityIndicator, StyleSheet, ViewStyle } from 'react-native';
 import { Colors, Radius, Typography, Spacing } from '../constants/theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -29,6 +29,8 @@ export default function Button({
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       style={({ pressed }) => [
         styles.base,
         styles[variant],
@@ -39,9 +41,12 @@ export default function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? Colors.white : Colors.primary} size="small" />
+        <ActivityIndicator
+          color={variant === 'primary' || variant === 'danger' ? Colors.white : Colors.primary}
+          size="small"
+        />
       ) : (
-        <Text style={[styles.label, styles[`label_${variant}` as keyof typeof styles] as TextStyle]}>
+        <Text style={[styles.label, styles[`label_${variant}` as keyof typeof styles] as any]}>
           {label}
         </Text>
       )}
@@ -51,20 +56,20 @@ export default function Button({
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: Spacing.sm + 4,
+    paddingVertical: Spacing.sm + 6,
     paddingHorizontal: Spacing.lg,
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 52, // WCAG touch target
   },
   primary: {
     backgroundColor: Colors.primary,
   },
   secondary: {
-    backgroundColor: Colors.surfaceAlt,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.primary,
   },
   ghost: {
     backgroundColor: 'transparent',
@@ -76,20 +81,21 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   disabled: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.82,
     transform: [{ scale: 0.98 }],
   },
   label: {
     ...Typography.titleSm,
+    letterSpacing: 0.3,
   },
   label_primary: {
     color: Colors.white,
   },
   label_secondary: {
-    color: Colors.text,
+    color: Colors.primary,
   },
   label_ghost: {
     color: Colors.primary,
