@@ -54,16 +54,16 @@ export default function InviteScreen() {
     if (!name.trim() || !rsvp || !event) return;
     setSubmitting(true);
     try {
-      // Upsert a guest rsvp (no user_id — use guest_name)
-      await supabase.from('rsvps').upsert({
+      const { error } = await supabase.from('rsvps').insert({
         event_id: event.id,
         user_id: null,
         guest_name: name.trim(),
         status: rsvp,
       });
+      // 23505 = unique_violation: already RSVPed with this name — treat as success
+      if (error && error.code !== '23505') throw error;
       setStep('done');
     } catch {
-      // silent — show done anyway so it's not frustrating
       setStep('done');
     } finally {
       setSubmitting(false);

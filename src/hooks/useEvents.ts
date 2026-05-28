@@ -4,7 +4,7 @@ import { Event, RsvpStatus } from '../types/database';
 
 const EVENT_QUERY = `
   *,
-  creator:users!events_created_by_fkey(id, name, avatar_url),
+  creator:users!events_created_by_fkey(id, display_name, avatar_url),
   rsvps(*, user:users(id, name, avatar_url))
 `;
 

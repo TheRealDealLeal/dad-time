@@ -43,6 +43,6 @@ export async function savePushToken(userId: string): Promise<void> {
   if (!token) return;
   await supabase
     .from('users')
-    .update({ expo_push_token: token })
+    .update({ push_token: token })
     .eq('id', userId);
 }
