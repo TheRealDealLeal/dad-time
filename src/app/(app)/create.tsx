@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
-  SafeAreaView, Pressable, Platform, KeyboardAvoidingView, FlatList,
+  Pressable, Platform, KeyboardAvoidingView, FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useHangouts } from '../../hooks/useHangouts';

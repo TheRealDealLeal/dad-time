@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator,
-  Platform, SafeAreaView, TextInput, KeyboardAvoidingView, ScrollView,
+  Platform, TextInput, KeyboardAvoidingView, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
