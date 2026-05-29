@@ -15,6 +15,7 @@ export default function HomeScreen() {
   const { hangouts, loading, fetchHangouts } = useHangouts(session!.user.id);
 
   useFocusEffect(useCallback(() => { fetchHangouts(); }, [fetchHangouts]));
+  const onRefresh = useCallback(() => { fetchHangouts(); }, [fetchHangouts]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -45,7 +46,7 @@ export default function HomeScreen() {
           contentContainerStyle={hangouts.length === 0 ? styles.emptyContent : styles.listContent}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={useCallback(() => fetchHangouts(), [fetchHangouts])} tintColor={Colors.primary} colors={[Colors.primary]} />
+            <RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={Colors.primary} colors={[Colors.primary]} />
           }
           ListEmptyComponent={
             <EmptyState
