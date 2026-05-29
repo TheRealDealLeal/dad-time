@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ActivityIndicator,
-  Platform, SafeAreaView,
+  Platform, SafeAreaView, TextInput, KeyboardAvoidingView, ScrollView,
 } from 'react-native';
 import { Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -14,7 +14,11 @@ WebBrowser.maybeCompleteAuthSession();
 
 export default function SignIn() {
   const { session } = useAuth();
-  const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
+  const [loading, setLoading] = useState<'google' | 'apple' | 'dev-in' | 'dev-up' | null>(null);
+  const [devEmail, setDevEmail] = useState('');
+  const [devPassword, setDevPassword] = useState('');
+  const [devError, setDevError] = useState('');
+  const [devExpanded, setDevExpanded] = useState(false);
 
   if (session) return <Redirect href="/(app)" />;
 
@@ -40,84 +44,184 @@ export default function SignIn() {
     }
   }
 
+  async function devSignIn() {
+    if (!devEmail.trim() || !devPassword.trim()) { setDevError('Enter email and password.'); return; }
+    setDevError('');
+    setLoading('dev-in');
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: devEmail.trim(),
+        password: devPassword.trim(),
+      });
+      if (error) throw error;
+    } catch (e: any) {
+      setDevError(e?.message ?? 'Sign in failed.');
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function devSignUp() {
+    if (!devEmail.trim() || !devPassword.trim()) { setDevError('Enter email and password.'); return; }
+    setDevError('');
+    setLoading('dev-up');
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: devEmail.trim(),
+        password: devPassword.trim(),
+      });
+      if (error) throw error;
+    } catch (e: any) {
+      setDevError(e?.message ?? 'Sign up failed.');
+    } finally {
+      setLoading(null);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-        {/* Hero */}
-        <View style={styles.hero}>
-          {/* Label badge */}
-          <View style={styles.labelBorder}>
-            <View style={styles.labelInner}>
-              <Text style={styles.labelTopText}>EST. 2025</Text>
-
-              <View style={styles.mugWrap}>
-                <Text style={styles.mug}>🍺</Text>
+          {/* Hero */}
+          <View style={styles.hero}>
+            <View style={styles.labelBorder}>
+              <View style={styles.labelInner}>
+                <Text style={styles.labelTopText}>EST. 2025</Text>
+                <View style={styles.mugWrap}>
+                  <Text style={styles.mug}>🍺</Text>
+                </View>
+                <Text style={styles.appName}>DAD TIME</Text>
+                <View style={styles.dividerLine} />
+                <Text style={styles.tagline}>GET THE CREW TOGETHER</Text>
               </View>
-
-              <Text style={styles.appName}>DAD TIME</Text>
-              <View style={styles.dividerLine} />
-              <Text style={styles.tagline}>GET THE CREW TOGETHER</Text>
             </View>
+            <Text style={styles.sub}>
+              Schedule hangouts, see who's in,{'\n'}and actually make it happen.
+            </Text>
           </View>
 
-          <Text style={styles.sub}>
-            Schedule hangouts, see who's in,{'\n'}and actually make it happen.
-          </Text>
-        </View>
+          {/* Activity icons row */}
+          <View style={styles.activitiesRow}>
+            {['🏌️', '🎮', '🎯', '🏈', '🎸', '🍕'].map((emoji, i) => (
+              <View key={i} style={styles.activityChip}>
+                <Text style={styles.activityEmoji}>{emoji}</Text>
+              </View>
+            ))}
+          </View>
 
-        {/* Activity icons row */}
-        <View style={styles.activitiesRow}>
-          {['🏌️', '🎮', '🎯', '🏈', '🎸', '🍕'].map((emoji, i) => (
-            <View key={i} style={styles.activityChip}>
-              <Text style={styles.activityEmoji}>{emoji}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Auth buttons */}
-        <View style={styles.authSection}>
-          <Pressable
-            style={({ pressed }) => [styles.authBtn, pressed && styles.pressed]}
-            onPress={() => signInWith('google')}
-            disabled={!!loading}
-            accessibilityRole="button"
-            accessibilityLabel="Continue with Google"
-          >
-            {loading === 'google' ? (
-              <ActivityIndicator color={Colors.primary} size="small" />
-            ) : (
-              <>
-                <Text style={styles.authBtnIcon}>G</Text>
-                <Text style={styles.authBtnLabel}>Continue with Google</Text>
-              </>
-            )}
-          </Pressable>
-
-          {Platform.OS === 'ios' && (
+          {/* Auth buttons */}
+          <View style={styles.authSection}>
             <Pressable
-              style={({ pressed }) => [styles.authBtn, styles.appleBtn, pressed && styles.pressed]}
-              onPress={() => signInWith('apple')}
+              style={({ pressed }) => [styles.authBtn, pressed && styles.pressed]}
+              onPress={() => signInWith('google')}
               disabled={!!loading}
               accessibilityRole="button"
-              accessibilityLabel="Continue with Apple"
+              accessibilityLabel="Continue with Google"
             >
-              {loading === 'apple' ? (
-                <ActivityIndicator color={Colors.white} size="small" />
+              {loading === 'google' ? (
+                <ActivityIndicator color={Colors.primary} size="small" />
               ) : (
                 <>
-                  <Text style={[styles.authBtnIcon, styles.appleBtnText]}></Text>
-                  <Text style={[styles.authBtnLabel, styles.appleBtnText]}>Continue with Apple</Text>
+                  <Text style={styles.authBtnIcon}>G</Text>
+                  <Text style={styles.authBtnLabel}>Continue with Google</Text>
                 </>
               )}
             </Pressable>
-          )}
 
-          <Text style={styles.disclaimer}>
-            By continuing, you agree to be a good hang.
-          </Text>
-        </View>
-      </View>
+            {Platform.OS === 'ios' && (
+              <Pressable
+                style={({ pressed }) => [styles.authBtn, styles.appleBtn, pressed && styles.pressed]}
+                onPress={() => signInWith('apple')}
+                disabled={!!loading}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Apple"
+              >
+                {loading === 'apple' ? (
+                  <ActivityIndicator color={Colors.white} size="small" />
+                ) : (
+                  <>
+                    <Text style={[styles.authBtnIcon, styles.appleBtnText]}></Text>
+                    <Text style={[styles.authBtnLabel, styles.appleBtnText]}>Continue with Apple</Text>
+                  </>
+                )}
+              </Pressable>
+            )}
+
+            <Text style={styles.disclaimer}>
+              By continuing, you agree to be a good hang.
+            </Text>
+
+            {/* Dev-only email/password login */}
+            {__DEV__ && (
+              <View style={styles.devSection}>
+                <Pressable
+                  onPress={() => setDevExpanded(e => !e)}
+                  style={styles.devToggle}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.devToggleText}>
+                    {devExpanded ? '▲ Dev Login' : '▼ Dev Login'}
+                  </Text>
+                </Pressable>
+
+                {devExpanded && (
+                  <View style={styles.devForm}>
+                    <TextInput
+                      style={styles.devInput}
+                      placeholder="test@example.com"
+                      placeholderTextColor={Colors.textFaint}
+                      value={devEmail}
+                      onChangeText={setDevEmail}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      accessibilityLabel="Dev login email"
+                    />
+                    <TextInput
+                      style={styles.devInput}
+                      placeholder="password"
+                      placeholderTextColor={Colors.textFaint}
+                      value={devPassword}
+                      onChangeText={setDevPassword}
+                      secureTextEntry
+                      accessibilityLabel="Dev login password"
+                    />
+                    {devError ? (
+                      <Text style={styles.devError}>{devError}</Text>
+                    ) : null}
+                    <View style={styles.devBtnRow}>
+                      <Pressable
+                        style={({ pressed }) => [styles.devBtn, pressed && { opacity: 0.75 }]}
+                        onPress={devSignIn}
+                        disabled={!!loading}
+                        accessibilityRole="button"
+                      >
+                        {loading === 'dev-in' ? (
+                          <ActivityIndicator color={Colors.white} size="small" />
+                        ) : (
+                          <Text style={styles.devBtnText}>Sign In</Text>
+                        )}
+                      </Pressable>
+                      <Pressable
+                        style={({ pressed }) => [styles.devBtn, pressed && { opacity: 0.75 }]}
+                        onPress={devSignUp}
+                        disabled={!!loading}
+                        accessibilityRole="button"
+                      >
+                        {loading === 'dev-up' ? (
+                          <ActivityIndicator color={Colors.white} size="small" />
+                        ) : (
+                          <Text style={styles.devBtnText}>Sign Up</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -128,7 +232,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   container: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: Spacing.lg,
     justifyContent: 'space-between',
     paddingBottom: Spacing.xl,
@@ -141,7 +245,6 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
 
-  // Craft label design
   labelBorder: {
     borderWidth: 2.5,
     borderColor: 'rgba(255,255,255,0.35)',
@@ -189,7 +292,6 @@ const styles = StyleSheet.create({
     letterSpacing: 2.5,
     fontSize: 10,
   },
-
   sub: {
     ...Typography.bodyMd,
     color: 'rgba(255,255,255,0.6)',
@@ -197,7 +299,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  // Activity row
   activitiesRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -218,7 +319,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 
-  // Auth buttons
   authSection: {
     gap: Spacing.sm,
   },
@@ -258,5 +358,61 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.35)',
     textAlign: 'center',
     marginTop: Spacing.xs,
+  },
+
+  // Dev login
+  devSection: {
+    marginTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.15)',
+    paddingTop: Spacing.md,
+  },
+  devToggle: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xs,
+  },
+  devToggleText: {
+    ...Typography.caption,
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: 1,
+  },
+  devForm: {
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  devInput: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 4,
+    ...Typography.bodyMd,
+    color: Colors.white,
+    minHeight: 48,
+  },
+  devError: {
+    ...Typography.bodySm,
+    color: 'rgba(255,160,160,1)',
+    textAlign: 'center',
+  },
+  devBtnRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  devBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    paddingVertical: Spacing.sm + 4,
+    alignItems: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  devBtnText: {
+    ...Typography.titleSm,
+    color: Colors.white,
   },
 });

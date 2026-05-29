@@ -1,84 +1,93 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TextInput,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+  ActivityIndicator, KeyboardAvoidingView, Platform,
+  ScrollView, Pressable,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import Button from '../../components/Button';
-import RsvpButtons from '../../components/RsvpButtons';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../constants/theme';
-import { Event, RsvpStatus } from '../../types/database';
-
-type Step = 'loading' | 'not-found' | 'name' | 'rsvp' | 'done';
+import { Hangout, HangoutOption, VoteValue } from '../../types/database';
 
 const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  return `${DAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${d.getDate()} · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+function fmt(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
+
+type Step = 'loading' | 'not-found' | 'name' | 'vote' | 'done';
+type VoteMap = Record<string, VoteValue>;
+
+const VOTE_OPTIONS: { value: VoteValue; label: string }[] = [
+  { value: 'yes',   label: "I'm Free" },
+  { value: 'maybe', label: 'Maybe'    },
+  { value: 'no',    label: "Can't"    },
+];
 
 export default function InviteScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
-  const [event, setEvent] = useState<Event | null>(null);
+  const [hangout, setHangout] = useState<Hangout | null>(null);
   const [step, setStep] = useState<Step>('loading');
   const [name, setName] = useState('');
-  const [rsvp, setRsvp] = useState<RsvpStatus | null>(null);
+  const [votes, setVotes] = useState<VoteMap>({});
   const [submitting, setSubmitting] = useState(false);
-  const [counts, setCounts] = useState({ yes: 0, maybe: 0, no: 0 });
 
-  useEffect(() => { loadEvent(); }, [code]);
+  useEffect(() => { loadHangout(); }, [code]);
 
-  async function loadEvent() {
+  async function loadHangout() {
     const { data, error } = await supabase
-      .from('events')
-      .select('*, rsvps(*)')
+      .from('hangouts')
+      .select(`*, options:hangout_options!hangout_id(*, votes:option_votes(*))`)
       .eq('invite_code', code)
       .single();
 
     if (error || !data) { setStep('not-found'); return; }
-
-    setEvent(data as Event);
-    const c = { yes: 0, maybe: 0, no: 0 };
-    (data.rsvps ?? []).forEach((r: any) => { c[r.status as RsvpStatus]++; });
-    setCounts(c);
+    const sorted = {
+      ...data,
+      options: [...(data.options ?? [])].sort((a: HangoutOption, b: HangoutOption) =>
+        new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
+      ),
+    };
+    setHangout(sorted as Hangout);
     setStep('name');
   }
 
   async function handleSubmit() {
-    if (!name.trim() || !rsvp || !event) return;
+    if (!name.trim() || !hangout) return;
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('rsvps').insert({
-        event_id: event.id,
-        user_id: null,
-        guest_name: name.trim(),
-        status: rsvp,
-      });
-      // 23505 = unique_violation — already RSVPed with this name, treat as success
-      if (error && error.code !== '23505') throw error;
+      const options = hangout.options ?? [];
+      for (const option of options) {
+        const value = votes[option.id];
+        if (!value) continue;
+        await supabase.from('option_votes').insert({
+          option_id: option.id,
+          guest_name: name.trim(),
+          value,
+        });
+      }
       setStep('done');
-    } catch {
+    } catch (e) {
+      console.error('guest vote failed', e);
       setStep('done');
     } finally {
       setSubmitting(false);
     }
   }
 
-  // ── Loading ────────────────────────────────────────────────────────────────
+  const options = hangout?.options ?? [];
+  const votedCount = Object.keys(votes).length;
+  const canSubmit = name.trim().length > 0 && votedCount > 0;
+
   if (step === 'loading') {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <ActivityIndicator color={Colors.primary} size="large" />
-        </View>
+        <View style={styles.center}><ActivityIndicator color={Colors.primary} size="large" /></View>
       </SafeAreaView>
     );
   }
 
-  // ── Not Found ──────────────────────────────────────────────────────────────
   if (step === 'not-found') {
     return (
       <SafeAreaView style={styles.safe}>
@@ -91,69 +100,41 @@ export default function InviteScreen() {
     );
   }
 
-  // ── Done ───────────────────────────────────────────────────────────────────
   if (step === 'done') {
-    const emoji = rsvp === 'yes' ? '🍻' : rsvp === 'maybe' ? '🤔' : '😔';
-    const headline = rsvp === 'yes' ? "You're in!" : rsvp === 'maybe' ? 'Marked as maybe.' : 'Got it — you\'re out.';
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <View style={styles.doneBadge}>
-            <Text style={styles.doneEmoji}>{emoji}</Text>
-          </View>
-          <Text style={styles.heading}>{headline}</Text>
-          <Text style={styles.eventNameDone}>{event?.title}</Text>
-          <Text style={styles.sub}>{event ? formatDateTime(event.date) : ''}</Text>
+          <View style={styles.doneBadge}><Text style={styles.doneEmoji}>🍻</Text></View>
+          <Text style={styles.heading}>You're in the mix, {name}!</Text>
+          <Text style={styles.sub}>{hangout?.title}</Text>
+          <Text style={styles.subSm}>The host will pick a time based on everyone's availability.</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ── Name + RSVP ───────────────────────────────────────────────────────────
-  const eventDate = event ? new Date(event.date) : null;
-
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
           {/* Brand header */}
           <View style={styles.brandHeader}>
             <Text style={styles.brandEmoji}>🍺</Text>
-            <View style={styles.brandText}>
+            <View>
               <Text style={styles.brandEyebrow}>YOU'RE INVITED</Text>
               <Text style={styles.brandName}>DAD TIME</Text>
             </View>
           </View>
 
-          {/* Event card */}
-          {event && eventDate && (
-            <View style={styles.eventCard}>
-              <View style={styles.eventDateStripe}>
-                <Text style={styles.stripeMonth}>{MONTHS[eventDate.getMonth()]}</Text>
-                <Text style={styles.stripeDay}>{eventDate.getDate()}</Text>
-                <Text style={styles.stripeDow}>{DAYS[eventDate.getDay()]}</Text>
-              </View>
-              <View style={styles.eventCardBody}>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventMeta}>{formatDateTime(event.date)}</Text>
-                {event.location ? <Text style={styles.eventMeta}>📍 {event.location}</Text> : null}
-                <View style={styles.crewLine}>
-                  <Text style={[styles.crewCount, { color: Colors.yes }]}>{counts.yes} in</Text>
-                  <Text style={styles.crewDot}> · </Text>
-                  <Text style={[styles.crewCount, { color: Colors.maybe }]}>{counts.maybe} maybe</Text>
-                </View>
-              </View>
-            </View>
-          )}
+          {/* Hangout card */}
+          <View style={styles.hangoutCard}>
+            <Text style={styles.hangoutTitle}>{hangout?.title}</Text>
+            {hangout?.note ? <Text style={styles.hangoutNote}>{hangout.note}</Text> : null}
+            <Text style={styles.hangoutMeta}>{options.length} time{options.length === 1 ? '' : 's'} proposed — vote on what works for you</Text>
+          </View>
 
-          {/* Name step */}
+          {/* Name field */}
           {step === 'name' && (
             <>
               <View style={styles.field}>
@@ -162,39 +143,87 @@ export default function InviteScreen() {
                   style={styles.input}
                   placeholder="What should we call you?"
                   placeholderTextColor={Colors.textFaint}
-                  value={name}
-                  onChangeText={setName}
-                  autoFocus
-                  maxLength={50}
-                  returnKeyType="next"
-                  onSubmitEditing={() => name.trim() && setStep('rsvp')}
+                  value={name} onChangeText={setName}
+                  autoFocus maxLength={50} returnKeyType="done"
+                  onSubmitEditing={() => name.trim() && options.length > 0 && setStep('vote')}
                   accessibilityLabel="Your name"
                 />
               </View>
               <Button
-                label="Continue →"
-                onPress={() => name.trim() && setStep('rsvp')}
-                disabled={!name.trim()}
+                label="See the Options →"
+                onPress={() => name.trim() && options.length > 0 && setStep('vote')}
+                disabled={!name.trim() || options.length === 0}
                 fullWidth
               />
+              {options.length === 0 && (
+                <Text style={styles.noOptionsNote}>No times have been proposed yet. Check back later!</Text>
+              )}
             </>
           )}
 
-          {/* RSVP step */}
-          {step === 'rsvp' && (
+          {/* Voting */}
+          {step === 'vote' && (
             <>
-              <View style={styles.promptRow}>
-                <Text style={styles.promptText}>Hey {name}, </Text>
-                <Text style={styles.promptBold}>are you in?</Text>
-              </View>
-              <RsvpButtons current={rsvp} onSelect={setRsvp} disabled={submitting} />
+              <Text style={styles.votePrompt}>Hey {name}, mark your availability for each option:</Text>
+
+              {options.map(option => {
+                const d = new Date(option.starts_at);
+                const myVote = votes[option.id];
+                return (
+                  <View key={option.id} style={styles.optionCard}>
+                    <View style={styles.optionStripe}>
+                      <Text style={styles.stripeMonth}>{MONTHS[d.getMonth()]}</Text>
+                      <Text style={styles.stripeDay}>{d.getDate()}</Text>
+                    </View>
+                    <View style={styles.optionBody}>
+                      <Text style={styles.optionTime}>
+                        {fmt(option.starts_at)}
+                        {option.ends_at ? ` – ${fmt(option.ends_at)}` : ''}
+                      </Text>
+                      {option.location ? <Text style={styles.optionLocation}>📍 {option.location}</Text> : null}
+                      {option.note ? <Text style={styles.optionNote}>{option.note}</Text> : null}
+
+                      <View style={styles.voteRow}>
+                        {VOTE_OPTIONS.map(({ value, label }) => (
+                          <Pressable
+                            key={value}
+                            style={({ pressed }) => [
+                              styles.voteBtn,
+                              myVote === value && value === 'yes'   && styles.voteActive_yes,
+                              myVote === value && value === 'maybe' && styles.voteActive_maybe,
+                              myVote === value && value === 'no'    && styles.voteActive_no,
+                              pressed && styles.voteBtnPressed,
+                            ]}
+                            onPress={() => setVotes(prev => ({ ...prev, [option.id]: value }))}
+                            accessibilityRole="radio"
+                            accessibilityState={{ checked: myVote === value }}
+                          >
+                            <Text style={[
+                              styles.voteBtnText,
+                              myVote === value && value === 'yes'   && styles.voteTextActive_yes,
+                              myVote === value && value === 'maybe' && styles.voteTextActive_maybe,
+                              myVote === value && value === 'no'    && styles.voteTextActive_no,
+                            ]}>
+                              {label}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+
               <Button
-                label="Send RSVP"
+                label={`Send Availability (${votedCount}/${options.length} voted)`}
                 onPress={handleSubmit}
                 loading={submitting}
-                disabled={!rsvp}
+                disabled={!canSubmit}
                 fullWidth
               />
+              {!canSubmit && votedCount < options.length && (
+                <Text style={styles.voteHint}>Vote on at least one option to submit.</Text>
+              )}
             </>
           )}
         </ScrollView>
@@ -204,179 +233,77 @@ export default function InviteScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    padding: Spacing.lg,
-  },
-  content: {
-    padding: Spacing.md,
-    gap: Spacing.md,
-    paddingBottom: Spacing.xxl,
-  },
+  safe: { flex: 1, backgroundColor: Colors.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, padding: Spacing.lg },
+  content: { padding: Spacing.md, gap: Spacing.md, paddingBottom: Spacing.xxl },
 
   brandHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    ...Shadow.sm,
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    backgroundColor: Colors.primary, borderRadius: Radius.lg, padding: Spacing.md, ...Shadow.sm,
   },
-  brandEmoji: {
-    fontSize: 40,
-  },
-  brandText: {
-    gap: 2,
-  },
-  brandEyebrow: {
-    ...Typography.label,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 2.5,
-    fontSize: 9,
-  },
-  brandName: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: Colors.white,
-    letterSpacing: 3,
-  },
+  brandEmoji: { fontSize: 40 },
+  brandEyebrow: { ...Typography.label, color: 'rgba(255,255,255,0.55)', letterSpacing: 2.5, fontSize: 9 },
+  brandName: { fontSize: 24, fontWeight: '900', color: Colors.white, letterSpacing: 3 },
 
-  eventCard: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    ...Shadow.sm,
+  hangoutCard: {
+    backgroundColor: Colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1.5, borderColor: Colors.border, padding: Spacing.md, gap: 4, ...Shadow.sm,
   },
-  eventDateStripe: {
-    width: 60,
-    backgroundColor: Colors.primaryMid,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    gap: 1,
-  },
-  stripeMonth: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    color: 'rgba(255,255,255,0.65)',
-  },
-  stripeDay: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: Colors.white,
-    lineHeight: 32,
-    letterSpacing: -1,
-  },
-  stripeDow: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1,
-    color: 'rgba(255,255,255,0.55)',
-  },
-  eventCardBody: {
-    flex: 1,
-    padding: Spacing.md,
-    gap: 4,
-  },
-  eventTitle: {
-    ...Typography.titleMd,
-    color: Colors.text,
-  },
-  eventMeta: {
-    ...Typography.bodySm,
-    color: Colors.textDim,
-  },
-  crewLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  crewCount: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  crewDot: {
-    ...Typography.bodySm,
-    color: Colors.textFaint,
-  },
+  hangoutTitle: { ...Typography.titleLg, color: Colors.text },
+  hangoutNote: { ...Typography.bodyMd, color: Colors.textDim, fontStyle: 'italic' },
+  hangoutMeta: { ...Typography.bodySm, color: Colors.textFaint, marginTop: 4 },
 
-  field: {
-    gap: Spacing.xs,
-  },
-  fieldLabel: {
-    ...Typography.label,
-    color: Colors.textFaint,
-    letterSpacing: 1.5,
-  },
+  field: { gap: Spacing.xs },
+  fieldLabel: { ...Typography.label, color: Colors.textFaint, letterSpacing: 1.5 },
   input: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 4,
-    ...Typography.bodyMd,
-    color: Colors.text,
-    minHeight: 52,
+    backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 2,
+    borderColor: Colors.border, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 4,
+    ...Typography.bodyMd, color: Colors.text, minHeight: 52,
   },
-  promptRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
-  },
-  promptText: {
-    ...Typography.titleLg,
-    color: Colors.textDim,
-  },
-  promptBold: {
-    ...Typography.titleLg,
-    color: Colors.text,
-  },
+  noOptionsNote: { ...Typography.bodySm, color: Colors.textFaint, textAlign: 'center' },
 
-  // Done state
+  votePrompt: { ...Typography.titleMd, color: Colors.text },
+
+  optionCard: {
+    backgroundColor: Colors.surface, borderRadius: Radius.lg,
+    flexDirection: 'row', overflow: 'hidden',
+    borderWidth: 1.5, borderColor: Colors.border, ...Shadow.sm,
+  },
+  optionStripe: {
+    width: 56, backgroundColor: Colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md,
+    borderRightWidth: 1.5, borderRightColor: Colors.border, gap: 1,
+  },
+  stripeMonth: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, color: Colors.primaryMid },
+  stripeDay: { fontSize: 24, fontWeight: '900', color: Colors.primary, lineHeight: 28, letterSpacing: -1 },
+  optionBody: { flex: 1, padding: Spacing.md, gap: Spacing.sm },
+  optionTime: { ...Typography.titleSm, color: Colors.text },
+  optionLocation: { ...Typography.bodySm, color: Colors.textDim },
+  optionNote: { ...Typography.bodySm, color: Colors.textFaint, fontStyle: 'italic' },
+
+  voteRow: { flexDirection: 'row', gap: Spacing.xs },
+  voteBtn: {
+    flex: 1, paddingVertical: Spacing.sm, borderRadius: Radius.sm,
+    backgroundColor: Colors.surfaceAlt, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center',
+  },
+  voteActive_yes: { backgroundColor: Colors.yesBg, borderColor: Colors.yes },
+  voteActive_maybe: { backgroundColor: Colors.maybeBg, borderColor: Colors.maybe },
+  voteActive_no: { backgroundColor: Colors.noBg, borderColor: Colors.no },
+  voteBtnPressed: { opacity: 0.7 },
+  voteBtnText: { fontSize: 11, fontWeight: '700', color: Colors.textDim },
+  voteTextActive_yes: { color: Colors.yes },
+  voteTextActive_maybe: { color: Colors.maybe },
+  voteTextActive_no: { color: Colors.no },
+
+  voteHint: { ...Typography.bodySm, color: Colors.textFaint, textAlign: 'center' },
+
   doneBadge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.primaryLight,
-    borderWidth: 3,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    width: 100, height: 100, borderRadius: 50, backgroundColor: Colors.primaryLight,
+    borderWidth: 3, borderColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  doneEmoji: {
-    fontSize: 48,
-  },
-  bigEmoji: {
-    fontSize: 64,
-    marginBottom: Spacing.sm,
-  },
-  heading: {
-    ...Typography.titleLg,
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  eventNameDone: {
-    ...Typography.displayMd,
-    color: Colors.primary,
-    textAlign: 'center',
-  },
-  sub: {
-    ...Typography.bodyMd,
-    color: Colors.textDim,
-    textAlign: 'center',
-  },
+  doneEmoji: { fontSize: 48 },
+  bigEmoji: { fontSize: 64 },
+  heading: { ...Typography.titleLg, color: Colors.text, textAlign: 'center' },
+  sub: { ...Typography.titleMd, color: Colors.primary, textAlign: 'center' },
+  subSm: { ...Typography.bodyMd, color: Colors.textDim, textAlign: 'center' },
 });

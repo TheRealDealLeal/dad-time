@@ -20,14 +20,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session && __DEV__) {
+        const { data } = await supabase.auth.signInAnonymously();
+        if (data.session) {
+          await supabase.from('users').upsert(
+            { id: data.session.user.id, display_name: 'Dev User' },
+            { onConflict: 'id' }
+          );
+        }
+        setSession(data.session);
+      } else {
+        setSession(session);
+      }
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      // Register push token whenever a new session starts
       if (session?.user) {
         savePushToken(session.user.id);
       }

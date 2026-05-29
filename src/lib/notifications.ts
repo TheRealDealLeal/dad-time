@@ -1,20 +1,30 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// expo-notifications removed Android push support from Expo Go in SDK 53.
+// Dynamically import it only when running in a real dev/prod build.
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+if (!isExpoGo) {
+  import('expo-notifications').then(({ setNotificationHandler }) => {
+    setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  });
+}
 
 export async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) return null;
+  if (isExpoGo || !Device.isDevice) return null;
+
+  const Notifications = await import('expo-notifications');
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;

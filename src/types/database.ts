@@ -6,28 +6,41 @@ export type User = {
   created_at: string;
 };
 
-export type Event = {
+export type HangoutStatus = 'planning' | 'confirmed';
+export type VoteValue = 'yes' | 'maybe' | 'no';
+
+export type Hangout = {
   id: string;
   title: string;
-  date: string;         // ISO timestamptz
-  location: string | null;
   note: string | null;
+  location: string | null;
   invite_code: string;
   created_by: string;
+  status: HangoutStatus;
+  confirmed_option_id: string | null;
   created_at: string;
-  // joined on fetch
   creator?: User;
-  rsvps?: Rsvp[];
+  options?: HangoutOption[];
 };
 
-export type Rsvp = {
+export type HangoutOption = {
   id: string;
-  event_id: string;
-  user_id: string | null;   // null for guest RSVPs
-  guest_name: string | null;
-  status: RsvpStatus;
-  updated_at: string;
-  user?: User;
+  hangout_id: string;
+  suggested_by: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  location: string | null;
+  note: string | null;
+  created_at: string;
+  suggester?: User;
+  votes?: OptionVote[];
 };
 
-export type RsvpStatus = 'yes' | 'maybe' | 'no';
+export type OptionVote = {
+  id: string;
+  option_id: string;
+  user_id: string | null;
+  guest_name: string | null;
+  value: VoteValue;
+  updated_at: string;
+};
