@@ -298,6 +298,17 @@ export default function HangoutScreen() {
             <Text style={styles.shareBtnText}>Share</Text>
           </Pressable>
         </View>
+
+        {/* Done — back to list. Only visible once at least one time has been proposed. */}
+        {options.length > 0 && (
+          <Pressable
+            style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.75 }]}
+            onPress={() => router.replace('/(app)' as any)}
+            accessibilityRole="button"
+          >
+            <Text style={styles.doneBtnText}>← Back to all hangouts</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -432,4 +443,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm, borderRadius: Radius.md, minHeight: 44, justifyContent: 'center',
   },
   shareBtnText: { ...Typography.titleSm, color: Colors.white },
+
+  doneBtn: {
+    alignItems: 'center', paddingVertical: Spacing.md,
+    borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  doneBtnText: { ...Typography.titleSm, color: Colors.primaryMid },
 });

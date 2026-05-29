@@ -14,6 +14,18 @@ const HANGOUT_QUERY = `
   options:hangout_options!hangout_id(${OPTION_QUERY})
 `;
 
+function hangoutSortKey(h: Hangout): number {
+  if (h.status === 'confirmed' && h.confirmed_option_id) {
+    const opt = (h.options ?? []).find(o => o.id === h.confirmed_option_id);
+    if (opt) return new Date(opt.starts_at).getTime();
+  }
+  const opts = h.options ?? [];
+  if (opts.length > 0) {
+    return Math.min(...opts.map(o => new Date(o.starts_at).getTime()));
+  }
+  return Infinity; // no options yet — handled separately in sort
+}
+
 export function useHangouts(userId: string | undefined) {
   const [hangouts, setHangouts] = useState<Hangout[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,7 +61,17 @@ export function useHangouts(userId: string | undefined) {
         return true;
       });
 
-      unique.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      unique.sort((a, b) => {
+        const aKey = hangoutSortKey(a);
+        const bKey = hangoutSortKey(b);
+        // No-option hangouts sink to the bottom, sorted newest-first among themselves
+        if (aKey === Infinity && bKey === Infinity) {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        if (aKey === Infinity) return 1;
+        if (bKey === Infinity) return -1;
+        return aKey - bKey; // ascending: soonest hangout first
+      });
       setHangouts(unique);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load hangouts');

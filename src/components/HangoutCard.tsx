@@ -25,7 +25,11 @@ export default function HangoutCard({ hangout, currentUserId }: Props) {
   const confirmedOption = confirmed
     ? options.find(o => o.id === hangout.confirmed_option_id)
     : null;
-  const d = confirmedOption ? new Date(confirmedOption.starts_at) : null;
+  const earliestOption = !confirmed && options.length > 0
+    ? options.reduce((min, o) => new Date(o.starts_at) < new Date(min.starts_at) ? o : min)
+    : null;
+  const displayOption = confirmedOption ?? earliestOption;
+  const d = displayOption ? new Date(displayOption.starts_at) : null;
 
   return (
     <Pressable
