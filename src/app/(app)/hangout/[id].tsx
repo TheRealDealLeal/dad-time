@@ -99,7 +99,12 @@ export default function HangoutScreen() {
 
   async function handleShare() {
     if (!hangout?.invite_code) return;
-    await Share.share({ message: `You're invited to ${hangout.title}!\n\nVote on times: dadtime://invite/${hangout.invite_code}` });
+    const inviteUrl = `dadtime://invite/${hangout.invite_code}`;
+    await Share.share({
+      // iOS uses `url` as the tappable hyperlink; Android embeds it in `message`
+      message: `You're invited to ${hangout.title}! Vote on what time works for you: ${inviteUrl}`,
+      url: inviteUrl,
+    });
   }
 
   if (loading) {
