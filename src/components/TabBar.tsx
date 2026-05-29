@@ -16,26 +16,26 @@ const TABS = [
   {
     name: 'index',
     label: 'Home',
-    icon:   { ios: 'house',       android: 'home_outlined', web: 'home' },
+    icon:   { ios: 'house',       android: 'home',          web: 'home' },
     iconOn: { ios: 'house.fill',  android: 'home',          web: 'home' },
   },
   {
     name: 'friends',
     label: 'Friends',
-    icon:   { ios: 'person.2',       android: 'group',         web: 'group' },
-    iconOn: { ios: 'person.2.fill',  android: 'group',         web: 'group' },
+    icon:   { ios: 'person.2',       android: 'group',     web: 'group' },
+    iconOn: { ios: 'person.2.fill',  android: 'group',     web: 'group' },
   },
   {
     name: 'activity',
     label: 'Activity',
-    icon:   { ios: 'bell',       android: 'notifications_none', web: 'notifications' },
-    iconOn: { ios: 'bell.fill',  android: 'notifications',     web: 'notifications' },
+    icon:   { ios: 'bell',       android: 'notifications', web: 'notifications' },
+    iconOn: { ios: 'bell.fill',  android: 'notifications', web: 'notifications' },
   },
   {
     name: 'profile',
     label: 'Profile',
-    icon:   { ios: 'person.crop.circle',       android: 'account_circle_outlined', web: 'person' },
-    iconOn: { ios: 'person.crop.circle.fill',  android: 'account_circle',          web: 'person' },
+    icon:   { ios: 'person.crop.circle',       android: 'account_circle', web: 'person' },
+    iconOn: { ios: 'person.crop.circle.fill',  android: 'account_circle', web: 'person' },
   },
 ] as const;
 
