@@ -42,12 +42,16 @@ export function useHangouts(userId: string | undefined) {
         .eq('created_by', userId)
         .order('created_at', { ascending: false });
 
-      const { data: voted, error: e2 } = await supabase
+      // Fatal — can't show anything without the user's own hangouts
+      if (e1) throw e1;
+
+      // Best-effort — find hangouts the user voted on (requires option_votes table).
+      // If the query fails (e.g. table missing or RLS not yet applied) we just skip it
+      // so the primary created-hangouts list still renders.
+      const { data: voted } = await supabase
         .from('option_votes')
         .select(`option:hangout_options!inner(hangout:hangouts!inner(${HANGOUT_QUERY}))`)
         .eq('user_id', userId);
-
-      if (e1 || e2) throw e1 || e2;
 
       const votedHangouts = (voted ?? [])
         .map((v: any) => v.option?.hangout)

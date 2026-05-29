@@ -303,7 +303,7 @@ export default function HangoutScreen() {
         {options.length > 0 && (
           <Pressable
             style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.75 }]}
-            onPress={() => router.replace('/(app)' as any)}
+            onPress={() => router.back()}
             accessibilityRole="button"
           >
             <Text style={styles.doneBtnText}>← Back to all hangouts</Text>
