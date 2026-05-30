@@ -69,7 +69,7 @@ export default function HangoutScreen() {
   async function handleVote(optionId: string, value: VoteValue) {
     setVotingId(optionId);
     try {
-      await castVote(optionId, value);
+      await castVote(optionId, value, hangout!.id);
       await load();
     } catch (e) {
       console.error('vote failed', e);

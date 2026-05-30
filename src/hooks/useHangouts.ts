@@ -131,7 +131,7 @@ export function useHangouts(userId: string | undefined) {
     return data;
   };
 
-  const castVote = async (optionId: string, value: VoteValue): Promise<void> => {
+  const castVote = async (optionId: string, value: VoteValue, hangoutId?: string): Promise<void> => {
     if (!userId) return;
     const { error } = await supabase
       .from('option_votes')
@@ -140,6 +140,13 @@ export function useHangouts(userId: string | undefined) {
         { onConflict: 'option_id,user_id' }
       );
     if (error) throw error;
+
+    // Notify the creator — fire-and-forget, never blocks the vote
+    if (hangoutId) {
+      supabase.functions.invoke('send-notification', {
+        body: { hangoutId, event: 'vote' },
+      }).catch(() => {});
+    }
   };
 
   const castGuestVote = async (
@@ -160,6 +167,11 @@ export function useHangouts(userId: string | undefined) {
       .eq('id', hangoutId)
       .eq('created_by', userId);
     if (error) throw error;
+
+    // Notify all voters — fire-and-forget
+    supabase.functions.invoke('send-notification', {
+      body: { hangoutId, event: 'confirmed' },
+    }).catch(() => {});
   };
 
   const deleteHangout = async (hangoutId: string): Promise<void> => {

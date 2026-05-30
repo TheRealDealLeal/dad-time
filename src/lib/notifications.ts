@@ -44,8 +44,16 @@ export async function registerForPushNotifications(): Promise<string | null> {
     });
   }
 
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
-  return token;
+  try {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const token = (
+      await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)
+    ).data;
+    return token;
+  } catch (e) {
+    console.warn('[notifications] Could not get push token:', e);
+    return null;
+  }
 }
 
 export async function savePushToken(userId: string): Promise<void> {
