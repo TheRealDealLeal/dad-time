@@ -43,4 +43,5 @@ export type OptionVote = {
   guest_name: string | null;
   value: VoteValue;
   updated_at: string;
+  voter?: { id: string; display_name: string | null } | null;
 };

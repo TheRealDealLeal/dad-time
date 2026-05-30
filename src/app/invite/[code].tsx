@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/Button';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../constants/theme';
 import { Hangout, HangoutOption, VoteValue } from '../../types/database';
@@ -28,6 +29,9 @@ const VOTE_OPTIONS: { value: VoteValue; label: string }[] = [
 
 export default function InviteScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
+  const { session } = useAuth();
+  const isLoggedIn = !!session?.user && !session.user.is_anonymous;
+
   const [hangout, setHangout] = useState<Hangout | null>(null);
   const [step, setStep] = useState<Step>('loading');
   const [name, setName] = useState('');
@@ -51,26 +55,36 @@ export default function InviteScreen() {
       ),
     };
     setHangout(sorted as Hangout);
-    setStep('name');
+    // Logged-in users skip the name step
+    setStep(isLoggedIn ? 'vote' : 'name');
   }
 
   async function handleSubmit() {
-    if (!name.trim() || !hangout) return;
+    if (!hangout) return;
+    if (!isLoggedIn && !name.trim()) return;
     setSubmitting(true);
     try {
       const options = hangout.options ?? [];
       for (const option of options) {
         const value = votes[option.id];
         if (!value) continue;
-        await supabase.from('option_votes').insert({
-          option_id: option.id,
-          guest_name: name.trim(),
-          value,
-        });
+        if (isLoggedIn && session?.user.id) {
+          // Upsert so repeated visits just update the vote
+          await supabase.from('option_votes').upsert(
+            { option_id: option.id, user_id: session.user.id, value, updated_at: new Date().toISOString() },
+            { onConflict: 'option_id,user_id' }
+          );
+        } else {
+          await supabase.from('option_votes').insert({
+            option_id: option.id,
+            guest_name: name.trim(),
+            value,
+          });
+        }
       }
       setStep('done');
     } catch (e) {
-      console.error('guest vote failed', e);
+      console.error('vote failed', e);
       setStep('done');
     } finally {
       setSubmitting(false);
@@ -79,7 +93,10 @@ export default function InviteScreen() {
 
   const options = hangout?.options ?? [];
   const votedCount = Object.keys(votes).length;
-  const canSubmit = name.trim().length > 0 && votedCount > 0;
+  const displayName = isLoggedIn
+    ? (session?.user.user_metadata?.full_name ?? session?.user.email?.split('@')[0] ?? 'You')
+    : name.trim();
+  const canSubmit = (isLoggedIn || name.trim().length > 0) && votedCount > 0;
 
   if (step === 'loading') {
     return (
@@ -106,7 +123,7 @@ export default function InviteScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <View style={styles.doneBadge}><Text style={styles.doneEmoji}>🍻</Text></View>
-          <Text style={styles.heading}>You're in the mix, {name}!</Text>
+          <Text style={styles.heading}>You're in the mix, {displayName}!</Text>
           <Text style={styles.sub}>{hangout?.title}</Text>
           <Text style={styles.subSm}>The host will pick a time based on everyone's availability.</Text>
         </View>
@@ -163,9 +180,18 @@ export default function InviteScreen() {
           )}
 
           {/* Voting */}
+          {/* Logged-in user greeting before vote list */}
+          {step === 'vote' && isLoggedIn && (
+            <View style={styles.loggedInBanner}>
+              <Text style={styles.loggedInText}>Voting as <Text style={styles.loggedInName}>{displayName}</Text></Text>
+            </View>
+          )}
+
           {step === 'vote' && (
             <>
-              <Text style={styles.votePrompt}>Hey {name}, mark your availability for each option:</Text>
+              <Text style={styles.votePrompt}>
+                {isLoggedIn ? 'Mark your availability for each option:' : `Hey ${name}, mark your availability for each option:`}
+              </Text>
 
               {options.map(option => {
                 const d = new Date(option.starts_at);
@@ -297,6 +323,14 @@ const styles = StyleSheet.create({
   voteTextActive_no: { color: Colors.no },
 
   voteHint: { ...Typography.bodySm, color: Colors.textFaint, textAlign: 'center' },
+
+  loggedInBanner: {
+    backgroundColor: Colors.primaryLight, borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    borderWidth: 1.5, borderColor: Colors.border,
+  },
+  loggedInText: { ...Typography.bodySm, color: Colors.primaryMid },
+  loggedInName: { fontWeight: '700', color: Colors.primary },
 
   doneBadge: {
     width: 100, height: 100, borderRadius: 50, backgroundColor: Colors.primaryLight,

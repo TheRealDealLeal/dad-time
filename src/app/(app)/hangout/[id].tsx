@@ -32,6 +32,13 @@ function voteCounts(option: HangoutOption) {
   };
 }
 
+function voterNames(option: HangoutOption, value: 'yes' | 'maybe' | 'no'): string {
+  return (option.votes ?? [])
+    .filter(v => v.value === value)
+    .map(v => v.voter?.display_name ?? v.guest_name ?? 'Someone')
+    .join(', ');
+}
+
 const VOTE_OPTIONS: { value: VoteValue; label: string }[] = [
   { value: 'yes',   label: "I'm Free" },
   { value: 'maybe', label: 'Maybe'    },
@@ -51,7 +58,7 @@ export default function HangoutScreen() {
   const load = useCallback(async () => {
     const { data } = await supabase
       .from('hangouts')
-      .select(`*, creator:users!created_by(id, display_name, avatar_url), options:hangout_options!hangout_id(*, suggester:users!suggested_by(id, display_name, avatar_url), votes:option_votes(*))`)
+      .select(`*, creator:users!created_by(id, display_name, avatar_url), options:hangout_options!hangout_id(*, suggester:users!suggested_by(id, display_name, avatar_url), votes:option_votes(*, voter:users!user_id(id, display_name)))`)
       .eq('id', id)
       .single();
     if (data) {
@@ -169,10 +176,17 @@ export default function HangoutScreen() {
               {confirmedOption.ends_at ? ` – ${fmt(confirmedOption.ends_at)}` : ''}
             </Text>
             {confirmedOption.location ? <Text style={styles.confirmedLocation}>📍 {confirmedOption.location}</Text> : null}
-            <View style={styles.confirmedCrew}>
-              <Text style={styles.confirmedCrewNum}>{confirmedOption.votes?.filter(v => v.value === 'yes').length ?? 0}</Text>
-              <Text style={styles.confirmedCrewLabel}> people said they're free</Text>
-            </View>
+            {(() => {
+              const yesVoters = (confirmedOption.votes ?? []).filter(v => v.value === 'yes');
+              const names = yesVoters.map(v => v.voter?.display_name ?? v.guest_name ?? 'Someone').join(' · ');
+              return (
+                <View style={styles.confirmedCrew}>
+                  <Text style={styles.confirmedCrewNum}>{yesVoters.length}</Text>
+                  <Text style={styles.confirmedCrewLabel}> {yesVoters.length === 1 ? 'person is' : 'people are'} in</Text>
+                  {names.length > 0 && <Text style={styles.confirmedCrewNames}>{names}</Text>}
+                </View>
+              );
+            })()}
           </View>
         )}
 
@@ -221,12 +235,28 @@ export default function HangoutScreen() {
                       {option.location ? <Text style={styles.optionLocation}>📍 {option.location}</Text> : null}
                       {option.note ? <Text style={styles.optionNote}>{option.note}</Text> : null}
 
-                      {/* Vote counts */}
+                      {/* Vote counts + names */}
                       <View style={styles.countsRow}>
                         <Text style={[styles.countChip, styles.countYes]}>{counts.yes} free</Text>
                         <Text style={[styles.countChip, styles.countMaybe]}>{counts.maybe} maybe</Text>
                         {counts.no > 0 && <Text style={[styles.countChip, styles.countNo]}>{counts.no} can't</Text>}
                       </View>
+                      {counts.yes > 0 && (
+                        <Text style={styles.voterNames} numberOfLines={2}>
+                          ✓ {voterNames(option, 'yes')}
+                        </Text>
+                      )}
+                      {counts.maybe > 0 && (
+                        <Text style={styles.voterNamesMaybe} numberOfLines={2}>
+                          ~ {voterNames(option, 'maybe')}
+                        </Text>
+                      )}
+                      {/* Proposer */}
+                      {option.suggester && (
+                        <Text style={styles.proposedBy}>
+                          Proposed by {option.suggester.display_name ?? 'someone'}
+                        </Text>
+                      )}
 
                       {/* Vote buttons */}
                       {isVoting ? (
@@ -351,9 +381,10 @@ const styles = StyleSheet.create({
   confirmedDate: { fontSize: 22, fontWeight: '900', color: Colors.white, letterSpacing: -0.5 },
   confirmedTime: { ...Typography.titleLg, color: 'rgba(255,255,255,0.9)' },
   confirmedLocation: { ...Typography.bodyMd, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
-  confirmedCrew: { flexDirection: 'row', alignItems: 'baseline', marginTop: Spacing.sm },
+  confirmedCrew: { alignItems: 'center', marginTop: Spacing.sm, gap: 4 },
   confirmedCrewNum: { fontSize: 28, fontWeight: '900', color: Colors.white },
   confirmedCrewLabel: { ...Typography.bodyMd, color: 'rgba(255,255,255,0.7)' },
+  confirmedCrewNames: { ...Typography.bodySm, color: 'rgba(255,255,255,0.65)', textAlign: 'center', fontStyle: 'italic' },
 
   noteBox: {
     backgroundColor: Colors.surfaceAlt, borderRadius: Radius.md,
@@ -397,6 +428,10 @@ const styles = StyleSheet.create({
   countYes: { backgroundColor: Colors.yesBg, color: Colors.yes },
   countMaybe: { backgroundColor: Colors.maybeBg, color: Colors.maybe },
   countNo: { backgroundColor: Colors.noBg, color: Colors.no },
+
+  voterNames: { ...Typography.bodySm, color: Colors.yes, fontStyle: 'italic' },
+  voterNamesMaybe: { ...Typography.bodySm, color: Colors.maybe, fontStyle: 'italic' },
+  proposedBy: { ...Typography.caption, color: Colors.textFaint, fontStyle: 'italic', marginTop: 2 },
 
   voteRow: { flexDirection: 'row', gap: Spacing.xs },
   voteBtn: {
